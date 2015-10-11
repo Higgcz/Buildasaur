@@ -9,7 +9,8 @@
 import Foundation
 import AppKit
 import BuildaUtils
-import BuildaCIServer
+import XcodeServerSDK
+import BuildaKit
 
 class StatusSyncerViewController: StatusViewController, SyncerDelegate {
         
@@ -113,9 +114,9 @@ class StatusSyncerViewController: StatusViewController, SyncerDelegate {
             itemsToReport.append(lastSyncString)
         }
         
-        strings.map { itemsToReport.append($0) }
+        strings.forEach { itemsToReport.append($0) }
         
-        self.statusTextField.stringValue = "\n".join(itemsToReport)
+        self.statusTextField.stringValue = itemsToReport.joinWithSeparator("\n")
     }
     
     override func viewDidLoad() {
@@ -152,7 +153,7 @@ class StatusSyncerViewController: StatusViewController, SyncerDelegate {
             self.postStatusCommentsToggle.state = syncer.postStatusComments ? NSOnState : NSOffState
         } else {
             self.updateIntervalFromUIToValue(15) //default
-            self.lttmToggle.state = NSOnState //default is true
+            self.lttmToggle.state = NSOffState //default is false
             self.postStatusCommentsToggle.state = NSOnState //default is true
         }
     }
@@ -180,7 +181,7 @@ class StatusSyncerViewController: StatusViewController, SyncerDelegate {
     
     @IBAction func branchWatchingTapped(sender: AnyObject) {
         
-         if let syncer = self.syncer() {
+         if let _ = self.syncer() {
             self.performSegueWithIdentifier("showBranchWatching", sender: self)
         } else {
             UIUtils.showAlertWithText("Syncer must be created first. Click 'Start' and try again.")
@@ -189,7 +190,7 @@ class StatusSyncerViewController: StatusViewController, SyncerDelegate {
     
     @IBAction func manualBotManagementTapped(sender: AnyObject) {
         
-        if let syncer = self.syncer() {
+        if let _ = self.syncer() {
             self.performSegueWithIdentifier("showManual", sender: self)
         } else {
             UIUtils.showAlertWithText("Syncer must be created first. Click 'Start' and try again.")
@@ -198,7 +199,7 @@ class StatusSyncerViewController: StatusViewController, SyncerDelegate {
     
     @IBAction func helpLttmButtonTapped(sender: AnyObject) {
         
-        let urlString = "https://github.com/czechboy0/Buildasaur/blob/master/README.md#the-lttm-barrier"
+        let urlString = "https://github.com/czechboy0/Buildasaur/blob/master/README.md#unlock-the-lttm-barrier"
         if let url = NSURL(string: urlString) {
             NSWorkspace.sharedWorkspace().openURL(url)
         }
@@ -206,7 +207,7 @@ class StatusSyncerViewController: StatusViewController, SyncerDelegate {
     
     @IBAction func helpPostStatusCommentsButtonTapped(sender: AnyObject) {
         
-        let urlString = "https://github.com/czechboy0/Buildasaur/blob/master/README.md#posting-status-comments"
+        let urlString = "https://github.com/czechboy0/Buildasaur/blob/master/README.md#envelope-posting-status-comments"
         if let url = NSURL(string: urlString) {
             NSWorkspace.sharedWorkspace().openURL(url)
         }

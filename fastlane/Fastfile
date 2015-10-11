@@ -5,52 +5,96 @@ update_fastlane
 
 # This is the minimum version number required.
 # Update this, if you use features of a newer version
-fastlane_version "1.1.0"
+fastlane_version "1.26.0"
 
-default_platform :mac
+before_all do |lane|
+end
 
-platform :mac do
+lane :prebuild do
+  cocoapods
+end
 
-  desc "Runs all the tests"
-  lane :test do
+lane :test do
+  run_tests
+end
 
-    xcodebuild(
-      test: true,
-      scheme: 'Buildasaur',
-      workspace: 'Buildasaur.xcworkspace'
+private_lane :run_tests do
+  prebuild
+  xcodebuild(
+    test: true,
+    scheme: 'Buildasaur',
+    workspace: 'Buildasaur.xcworkspace'
     )
+end
 
-  end
+lane :release do
 
-  desc "Archives (and in the future will upload a new release to GitHub)"
-  lane :github do
-
-    # also add incrementing of build and version number, when it becomes available
-    # for mac - https://github.com/KrauseFx/fastlane/pull/291
-
-    xcodebuild(
-      test: true,
-      archive: true,
-      archive_path: './build/Buildasaur.xcarchive',
-      scheme: 'Buildasaur',
-      workspace: 'Buildasaur.xcworkspace'
+  run_tests
+  version = get_info_plist_value(
+      key: "CFBundleShortVersionString",
+      path: "Buildasaur/Info.plist"
     )
+  build
+  github(
+    assets: ["./build/#{file_name}.app"],
+    version: version
+    )
+end
 
-  end
+lane :build do
+  gym(
+    scheme: 'Buildasaur',
+    output_name: 'Buildasaur',
+    output_directory: './build'
+    )
+end
 
-  # You can define as many lanes as you want
+private_lane :github do |params|
 
-  after_all do |lane|
-    # slack(
-    #   message: "Successfully deployed new App Update."
-    # )
-  end
+  assets = params[:assets]
+  version = params[:version]
+  version_tag = "v#{version}"
 
-  error do |lane, exception|
-    # slack(
-    #   message: exception.message,
-    #   success: false
-    # )
-  end
+  # prep the local state
+  ensure_git_status_clean
+  ensure_git_branch(branch: "master")
+  git_pull
+
+  # regen the changelog and open it
+  sh "cd .. && github_changelog_generator -t $GITHUB_TOKEN && subl CHANGELOG.md"
+
+  # ask for the version
+  title = prompt(text: 'Release Title: ')
+  description = prompt(text: "Release changelog: ",
+   multi_line_end_keyword: "END")
+
+  # create a new release on GitHub
+  repo_url = "czechboy0/Buildasaur"
+  ENV["FL_GITHUB_RELEASE_API_TOKEN"] = ENV["GITHUB_TOKEN"]
+  release = set_github_release(
+    repository_name: repo_url,
+    upload_assets: assets,
+    name: [version_tag, title].join(" - "),
+    tag_name: version_tag,
+    description: description,
+    is_draft: false,
+    is_prerelease: false
+  )
+
+  sh "cd .. && rm -rf build" #delete built ipa/app
+
+  # notify us on slack
+  slack(
+    slack_url: ENV['SLACK_RELEASES_URL'],
+    message: "Successfully released [Buildasaur #{version_tag}](#{release['html_url']}) :rocket:",
+    payload: {
+      "New" => release['body']
+    }
+  )
+
+  # regenerate changelog to get it committed
+  sh "cd .. && github_changelog_generator -t $GITHUB_TOKEN"
+  sh "cd .. && git commit -am \"changelog\" && git push"
 
 end
+
